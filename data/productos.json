@@ -1,0 +1,68 @@
+[
+  {
+    "nombre": "Cuenta de Ahorro",
+    "categoria": "Cuentas",
+    "descripcion": "Cuenta transaccional con rentabilidad diaria y tarjeta débito Visa sin costo de manejo.",
+    "beneficios": "Transferencias gratuitas a cualquier banco, retiros sin tarjeta en red nacional.",
+    "requisitos": "Cédula original de 9-10 dígitos, mayoría de edad o autorización de tutor legal.",
+    "tasa_o_costo": "Rentabilidad del 3.50% E.A. sobre saldo diario.",
+    "monto_minimo": 0.0,
+    "plazo_minimo_meses": 0,
+    "activo": true
+  },
+  {
+    "nombre": "CDT Digital",
+    "categoria": "Inversión",
+    "descripcion": "Certificado de Depósito a Término de alta rentabilidad con tasa fija garantizada.",
+    "beneficios": "Inversión 100% segura amparada por seguro FOGAFIN, plazos a tu medida.",
+    "requisitos": "Monto mínimo desde $500,000 COP y cuenta de ahorros activa.",
+    "tasa_o_costo": "Tasa fija entre 10.5% y 11.8% E.A. según plazo.",
+    "monto_minimo": 500000.0,
+    "plazo_minimo_meses": 3,
+    "activo": true
+  },
+  {
+    "nombre": "Tarjeta de Crédito Oro",
+    "categoria": "Tarjetas",
+    "descripcion": "Tarjeta de crédito con cupo en pesos y dólares, compras sin contacto y millas.",
+    "beneficios": "6 meses sin cuota de manejo, asistencias médicas en viajes y casillero virtual.",
+    "requisitos": "Ingresos mensuales demostrables desde $2,000,000 COP.",
+    "tasa_o_costo": "Tasa de interés de 1.95% M.V. para compras a cuotas.",
+    "monto_minimo": 1000000.0,
+    "plazo_minimo_meses": 1,
+    "activo": true
+  },
+  {
+    "nombre": "Crédito Libre Inversión",
+    "categoria": "Créditos",
+    "descripcion": "Préstamo de libre destinación con desembolso inmediato y tasa fija en cuota mensual.",
+    "beneficios": "Sin cobro por estudio de crédito, plazo hasta 60 meses, abonos a capital sin penalidad.",
+    "requisitos": "Edad entre 18 y 75 años, cédula y buen comportamiento crediticio.",
+    "tasa_o_costo": "Tasa desde 1.55% a 1.75% mensual según plazo.",
+    "monto_minimo": 500000.0,
+    "plazo_minimo_meses": 6,
+    "activo": true
+  },
+  {
+    "nombre": "Crédito Hipotecario",
+    "categoria": "Créditos",
+    "descripcion": "Financiación para compra de vivienda nueva o usada (VIS y No VIS) con beneficios tributarios.",
+    "beneficios": "Financiación de hasta el 80% del avalúo, cuota fija en pesos o UVR, plazos de 5 a 30 años.",
+    "requisitos": "Monto mínimo de $10,000,000 COP, plazo mínimo de 60 meses, soporte de ingresos demostrables.",
+    "tasa_o_costo": "Tasa preferencial desde 0.72% a 0.85% mensual (~9.0% a 10.7% E.A.).",
+    "monto_minimo": 10000000.0,
+    "plazo_minimo_meses": 60,
+    "activo": true
+  },
+  {
+    "nombre": "Pagos Inmediatos QR",
+    "categoria": "Servicios Digitales",
+    "descripcion": "Ecosistema de pagos y transferencias inmediatas e interoperables mediante código QR.",
+    "beneficios": "Sin costo de transacción, acreditación en 5 segundos las 24 horas del día.",
+    "requisitos": "Teléfono inteligente y cuenta de ahorros activa.",
+    "tasa_o_costo": "$0 COP de tarifa.",
+    "monto_minimo": 1000.0,
+    "plazo_minimo_meses": 0,
+    "activo": true
+  }
+]

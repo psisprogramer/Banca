@@ -1,0 +1,51 @@
+{
+  "valen": {
+    "usuario": "valen",
+    "tipo": "cliente",
+    "nombre": "VALENTINA MORALES",
+    "cedula": "1000000003",
+    "pin": "1234"
+  },
+  "caro3456": {
+    "usuario": "caro3456",
+    "tipo": "cliente",
+    "nombre": "CAROLINA MOLINA PEREZ",
+    "cedula": "1000382808",
+    "pin": "1234"
+  },
+  "andrescastro01": {
+    "usuario": "andrescastro01",
+    "tipo": "cliente",
+    "nombre": "ANDRES FELIPE CASTRO",
+    "cedula": "1098765432",
+    "pin": "5678"
+  },
+  "asesor": {
+    "usuario": "asesor",
+    "tipo": "asesor",
+    "nombre": "CARLOS ASESOR BANCARIO",
+    "cedula": "1000000002",
+    "pin": "1234"
+  },
+  "empleado1": {
+    "usuario": "empleado1",
+    "tipo": "empleado",
+    "nombre": "JORGE SALAS",
+    "cedula": "1000000004",
+    "pin": "1234"
+  },
+  "admin": {
+    "usuario": "admin",
+    "tipo": "administrador",
+    "nombre": "ADMINISTRADOR GENERAL",
+    "cedula": "1000000001",
+    "pin": "1234"
+  },
+  "dilan123": {
+    "usuario": "dilan123",
+    "tipo": "cliente",
+    "nombre": "PEIOTOFI DAS",
+    "cedula": "1234567892",
+    "pin": "1234"
+  }
+}
