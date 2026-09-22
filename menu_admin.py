@@ -10,7 +10,7 @@ from ui import (
 from validaciones import (
     leer_nombre_validado, leer_cedula_validada, leer_usuario_validado,
     leer_contrasena_confirmada, leer_numero_entero, leer_monto_monetario,
-    leer_texto_simple
+    leer_texto_simple, leer_tasa_interes, validar_tasa_interes
 )
 from analitica_riesgo import (
     construir_grilla_riesgo, generar_reporte_extendido,
@@ -45,7 +45,7 @@ def submenu_catalogo_productos(banco_db):
             desc = leer_texto_simple("Descripción del producto")
             beneficios = leer_texto_simple("Principales beneficios")
             requisitos = leer_texto_simple("Requisitos para contratación")
-            tasa = leer_texto_simple("Tasa o costo asociado")
+            tasa, tasa_num = leer_tasa_interes("Tasa de interés o costo asociado", categoria=categoria)
             monto_min = leer_monto_monetario("Monto mínimo de apertura/solicitud", minimo=0.0, default=0.0)
             plazo_min = leer_numero_entero("Plazo mínimo en meses (0 si no aplica)", minimo=0, default=0)
 
@@ -64,10 +64,24 @@ def submenu_catalogo_productos(banco_db):
                 }
                 banco_db.catalogo_productos.insertar_final(nuevo_prod)
                 banco_db.guardar_productos()
-                banco_db.auditoria.apilar(f"Producto creado: {nombre}")
+
+                # Si es un crédito con plazo y tasa porcentual definida, registrar en matriz de tasas
+                if any(c in categoria.lower() for c in ["crédito", "credito"]) and tasa_num is not None and plazo_min > 0:
+                    banco_db.matriz_tasas.asignar(nombre, plazo_min, tasa_num)
+                    banco_db.guardar_tasas()
+
+                def reversor_prod():
+                    banco_db.catalogo_productos.eliminar(lambda p: p.get("nombre") == nombre)
+                    banco_db.guardar_productos()
+                    return True
+
+                banco_db.auditoria.apilar(f"Producto creado: {nombre}", reversor_prod)
                 caja_mensaje("exito", "PRODUCTO CREADO", [
-                    f"Producto '{nombre}' incorporado exitosamente.",
-                    "Guardado en data/productos.json."
+                    f"Producto:     {nombre}",
+                    f"Categoría:    {categoria}",
+                    f"Tasa / Costo: {tasa}",
+                    f"Monto Mínimo: {fmt_dinero(monto_min)}",
+                    "Guardado en data/productos.json con disponibilidad inmediata."
                 ])
             pausa()
 
@@ -99,7 +113,14 @@ def submenu_catalogo_productos(banco_db):
             print(f"  Editando: {BOLD}{prod['nombre']}{RESET}")
             nuevo_nombre = leer_texto_simple(f"Nuevo nombre (Actual: {prod['nombre']})", obligatorio=False) or prod['nombre']
             nueva_desc = leer_texto_simple("Nueva descripción", obligatorio=False) or prod.get('descripcion', '')
-            nueva_tasa = leer_texto_simple("Nueva tasa/costo", obligatorio=False) or prod.get('tasa_o_costo', '')
+            nueva_tasa_in = leer_texto_simple(f"Nueva tasa/costo (Actual: {prod.get('tasa_o_costo', '')})", obligatorio=False)
+            if nueva_tasa_in:
+                valido_t, tasa_fmt, _ = validar_tasa_interes(nueva_tasa_in, prod.get("categoria", "General"))
+                nueva_tasa = tasa_fmt if valido_t else prod.get("tasa_o_costo", "")
+                if not valido_t:
+                    print(f"    {AMARILLO}{tasa_fmt}. Se conserva la tasa previa.{RESET}")
+            else:
+                nueva_tasa = prod.get("tasa_o_costo", "")
 
             if confirmar(f"¿Confirma actualizar los datos de '{prod['nombre']}'?"):
                 prod["nombre"] = nuevo_nombre
@@ -346,19 +367,20 @@ def submenu_usuarios_internos(banco_db):
     while True:
         sesion = banco_db.sesion_actual
         cabecera_menu("Control de Usuarios Internos", sesion.get("tipo"), sesion.get("nombre"))
-        print(f"  {CYAN}1.{RESET} Crear nuevo usuario interno {GRIS}(Asesor o Administrador){RESET}")
-        print(f"  {CYAN}2.{RESET} Desactivar / Eliminar usuario interno")
-        print(f"  {CYAN}3.{RESET} Listar usuarios registrados en el sistema")
+        print(f"  {CYAN}1.{RESET} Crear nuevo funcionario interno {GRIS}(Asesor o Administrador){RESET}")
+        print(f"  {CYAN}2.{RESET} Desactivar / Reactivar funcionario interno {GRIS}(Alternar acceso activo/inactivo){RESET}")
+        print(f"  {CYAN}3.{RESET} Eliminar funcionario interno permanentemente")
+        print(f"  {CYAN}4.{RESET} Listar funcionarios y usuarios registrados")
         print(f"  {ROJO}0.{RESET} Volver al menú de administrador\n")
 
-        op = input(f"  {BOLD}Selecciona una opción [0-3]:{RESET} ").strip()
+        op = input(f"  {BOLD}Selecciona una opción [0-4]:{RESET} ").strip()
 
         if op == "1":
             cabecera_menu("Creación de Funcionario Interno", sesion.get("tipo"), sesion.get("nombre"))
 
             # Validaciones estrictas:
-            # 1. Cédula
-            cedula = leer_cedula_validada("Cédula de ciudadanía del funcionario (9 a 10 dígitos)")
+            # 1. Cédula global sin duplicados (ni en clientes ni en usuarios)
+            cedula = leer_cedula_validada("Cédula de ciudadanía del funcionario (9 a 10 dígitos)", banco_db=banco_db)
 
             # 2. Nombre y apellido en mayúsculas
             nombre = leer_nombre_validado("Nombre Completo (Nombre y Apellido)")
@@ -383,23 +405,32 @@ def submenu_usuarios_internos(banco_db):
                     "tipo": rol,
                     "nombre": nombre,
                     "cedula": cedula,
-                    "pin": pin
+                    "pin": pin,
+                    "activo": True
                 }
                 banco_db.tabla_usuarios.insertar(usuario, datos_nuevo_usuario)
                 banco_db.guardar_usuarios()
-                banco_db.auditoria.apilar(f"Usuario interno creado: {usuario} ({rol})")
+
+                def reversor_crear_usr():
+                    banco_db.tabla_usuarios.eliminar(usuario)
+                    banco_db.guardar_usuarios()
+                    return True
+
+                banco_db.auditoria.apilar(f"Usuario interno creado: {usuario} ({rol})", reversor_crear_usr)
 
                 caja_mensaje("exito", "USUARIO INTERNO CREADO", [
                     f"Usuario:  {usuario}",
                     f"Nombre:   {nombre}",
                     f"Cédula:   {cedula}",
                     f"Rol:      {rol.capitalize()}",
+                    f"Estado:   {badge('activo')}",
                     "Guardado en data/usuarios.json con acceso inmediato."
                 ])
             pausa()
 
         elif op == "2":
-            usuario = leer_texto_simple("Usuario a retirar").lower()
+            cabecera_menu("Desactivar / Reactivar Funcionario", sesion.get("tipo"), sesion.get("nombre"))
+            usuario = leer_texto_simple("Usuario a modificar estado").lower()
             if usuario == sesion.get("usuario"):
                 print(f"\n  {ROJO}No puedes desactivar tu propio usuario en sesión activa.{RESET}")
                 pausa()
@@ -411,26 +442,74 @@ def submenu_usuarios_internos(banco_db):
                 pausa()
                 continue
 
-            if confirmar(f"¿Está seguro de ELIMINAR permanentemente las credenciales de '{usuario}'?"):
-                animacion_timer(0.4, "Revocando accesos en JSON")
-                banco_db.tabla_usuarios.eliminar(usuario)
+            estado_actual = datos.get("activo", True)
+            nuevo_estado = not estado_actual
+            accion_txt = "REACTIVAR" if nuevo_estado else "DESACTIVAR"
+            estado_lbl = "ACTIVO" if nuevo_estado else "INACTIVO"
+
+            if confirmar(f"¿Confirma {accion_txt} el acceso al usuario '{usuario}' ({datos.get('nombre')})?"):
+                animacion_timer(0.3, "Actualizando estado en JSON")
+                datos["activo"] = nuevo_estado
                 banco_db.guardar_usuarios()
-                banco_db.auditoria.apilar(f"Usuario interno eliminado: {usuario}")
-                print(f"\n  {VERDE}Usuario '{usuario}' retirado con éxito.{RESET}")
+
+                def reversor_estado():
+                    datos["activo"] = estado_actual
+                    banco_db.guardar_usuarios()
+                    return True
+
+                banco_db.auditoria.apilar(f"Usuario {usuario} {estado_lbl.lower()}", reversor_estado)
+                caja_mensaje("exito", "ESTADO ACTUALIZADO", [
+                    f"Usuario:      {usuario} ({datos.get('nombre')})",
+                    f"Nuevo Estado: {badge('activo' if nuevo_estado else 'inactivo')}",
+                    f"El usuario {'ahora puede iniciar sesión normalmente' if nuevo_estado else 'ha sido suspendido para ingresar al sistema'}."
+                ])
             pausa()
 
         elif op == "3":
+            cabecera_menu("Eliminación de Usuario Interno", sesion.get("tipo"), sesion.get("nombre"))
+            usuario = leer_texto_simple("Usuario a eliminar").lower()
+            if usuario == sesion.get("usuario"):
+                print(f"\n  {ROJO}No puedes eliminar tu propio usuario en sesión activa.{RESET}")
+                pausa()
+                continue
+
+            datos = banco_db.tabla_usuarios.buscar(usuario)
+            if not datos:
+                print(f"\n  {ROJO}El usuario '{usuario}' no existe en el sistema.{RESET}")
+                pausa()
+                continue
+
+            if confirmar(f"{ROJO_BRILLANTE}¿Está seguro de ELIMINAR permanentemente las credenciales de '{usuario}' ({datos.get('nombre')})?{RESET}"):
+                animacion_timer(0.4, "Revocando accesos en JSON")
+                datos_respaldo = dict(datos)
+                banco_db.tabla_usuarios.eliminar(usuario)
+                banco_db.guardar_usuarios()
+
+                def reversor_elim():
+                    banco_db.tabla_usuarios.insertar(usuario, datos_respaldo)
+                    banco_db.guardar_usuarios()
+                    return True
+
+                banco_db.auditoria.apilar(f"Usuario interno eliminado: {usuario}", reversor_elim)
+                caja_mensaje("exito", "USUARIO RETIRADO", [
+                    f"El usuario '{usuario}' fue retirado del sistema.",
+                    "Los cambios han sido guardados en data/usuarios.json."
+                ])
+            pausa()
+
+        elif op == "4":
             cabecera_menu("Usuarios Registrados en el Sistema", sesion.get("tipo"), sesion.get("nombre"))
             usuarios = banco_db.tabla_usuarios.listar_valores()
-            print(f"  {BOLD}{'USUARIO':<14} | {'NOMBRE':<30} | {'CÉDULA':<12} | {'ROL'}{RESET}")
-            print(f"  {'─' * 70}")
+            print(f"  {BOLD}{'USUARIO':<14} | {'NOMBRE':<26} | {'CÉDULA':<12} | {'ROL':<14} | {'ESTADO'}{RESET}")
+            print(f"  {'─' * 80}")
             for u in usuarios:
                 tipo = u.get("tipo", "cliente")
                 col_r = CYAN if tipo == "cliente" else (AMARILLO if tipo in ("asesor", "empleado") else MAGENTA)
                 rol_txt = "Asesor" if tipo in ("asesor", "empleado") else tipo.capitalize()
                 ced = u.get("cedula", "N/A")
-                print(f"  {u['usuario']:<14} | {u['nombre']:<30} | {ced:<12} | {col_r}{rol_txt}{RESET}")
-            print(f"\n  {GRIS}Total de usuarios activos: {len(usuarios)}{RESET}")
+                est_badge = badge("activo" if u.get("activo", True) else "inactivo")
+                print(f"  {u['usuario']:<14} | {u['nombre']:<26} | {ced:<12} | {col_r}{rol_txt:<14}{RESET} | {est_badge}")
+            print(f"\n  {GRIS}Total de usuarios registrados: {len(usuarios)}{RESET}")
             pausa()
 
         elif op == "0":

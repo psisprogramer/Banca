@@ -1,23 +1,17 @@
 {
+  "empleado1": {
+    "usuario": "empleado1",
+    "tipo": "empleado",
+    "nombre": "JORGE SALAS",
+    "cedula": "1000000004",
+    "pin": "1234",
+    "activo": true
+  },
   "admin": {
     "usuario": "admin",
     "tipo": "administrador",
     "nombre": "ADMINISTRADOR GENERAL",
     "cedula": "1000000001",
-    "pin": "1234"
-  },
-  "andrescastro01": {
-    "usuario": "andrescastro01",
-    "tipo": "cliente",
-    "nombre": "ANDRES FELIPE CASTRO",
-    "cedula": "1098765432",
-    "pin": "5678"
-  },
-  "fffffff3": {
-    "usuario": "fffffff3",
-    "tipo": "cliente",
-    "nombre": "CNDJD JFR",
-    "cedula": "1234567897",
     "pin": "1234"
   },
   "caro3456": {
@@ -34,6 +28,13 @@
     "cedula": "1000000002",
     "pin": "1234"
   },
+  "andrescastro01": {
+    "usuario": "andrescastro01",
+    "tipo": "cliente",
+    "nombre": "ANDRES FELIPE CASTRO",
+    "cedula": "1098765432",
+    "pin": "5678"
+  },
   "dilan123": {
     "usuario": "dilan123",
     "tipo": "cliente",
@@ -41,11 +42,11 @@
     "cedula": "1234567892",
     "pin": "1234"
   },
-  "empleado1": {
-    "usuario": "empleado1",
-    "tipo": "empleado",
-    "nombre": "JORGE SALAS",
-    "cedula": "1000000004",
+  "fffffff3": {
+    "usuario": "fffffff3",
+    "tipo": "cliente",
+    "nombre": "CNDJD JFR",
+    "cedula": "1234567897",
     "pin": "1234"
   }
 }

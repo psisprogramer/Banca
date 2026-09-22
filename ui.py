@@ -7,6 +7,8 @@ import os
 import sys
 import time
 import datetime
+import re
+import textwrap
 
 # Habilita secuencias de escape ANSI y codificación UTF-8 en Windows
 if os.name == "nt":
@@ -154,8 +156,13 @@ def cabecera_menu(titulo, rol=None, usuario=None):
     print(f"{color_rol}{BOLD}└{'─' * 67}┘{RESET}\n")
 
 
-def caja_mensaje(tipo, titulo, lineas, ancho=67):
-    """Imprime recuadros informativos elegantes con bordes redondeados."""
+def quitar_ansi(texto):
+    """Elimina secuencias de escape ANSI para cálculo visual exacto de longitudes."""
+    return re.sub(r'\033\[[0-9;]*[a-zA-Z]', '', str(texto))
+
+
+def caja_mensaje(tipo, titulo, lineas, ancho=70):
+    """Imprime recuadros informativos elegantes con bordes redondeados y ajuste automático de texto."""
     colores = {
         "exito": VERDE_BRILLANTE,
         "error": ROJO_BRILLANTE,
@@ -173,21 +180,88 @@ def caja_mensaje(tipo, titulo, lineas, ancho=67):
     c = colores.get(tipo, BLANCO)
     icono = iconos.get(tipo, "•")
 
-    print(f"\n  {c}╭{'─' * (ancho - 2)}╮{RESET}")
+    if isinstance(lineas, str):
+        lineas = [lineas]
+
+    # Determinación dinámica del ancho necesario respetando límites
+    ancho_titulo = len(quitar_ansi(titulo)) + 8
+    max_contenido = max((len(quitar_ansi(l)) for l in lineas), default=0) + 6
+    ancho_calculado = max(ancho, ancho_titulo, min(max_contenido, 76))
+    ancho_final = min(ancho_calculado, 78)
+    ancho_interno = ancho_final - 2
+    max_line_w = ancho_interno - 4
+
+    # Envolver texto para que ninguna línea exceda el ancho interior
+    lineas_procesadas = []
+    for l in lineas:
+        l_str = str(l)
+        l_plana = quitar_ansi(l_str)
+        if len(l_plana) > max_line_w:
+            sublineas = textwrap.wrap(l_str, width=max_line_w, break_long_words=True)
+            lineas_procesadas.extend(sublineas if sublineas else [""])
+        else:
+            lineas_procesadas.append(l_str)
+
+    print(f"\n  {c}╭{'─' * ancho_interno}╮{RESET}")
     titulo_formateado = f" [{icono}] {titulo} "
-    print(f"  {c}│{BOLD}{titulo_formateado.center(ancho - 2)}{RESET}{c}│{RESET}")
-    print(f"  {c}├{'─' * (ancho - 2)}┤{RESET}")
-    for linea in lineas:
-        # Remueve códigos de escape para cálculo visual del ancho
-        linea_plana = linea
-        for code in [RESET, BOLD, DIM, ITALIC, UNDERLINE, ROJO, VERDE, AMARILLO, AZUL, MAGENTA, CYAN, BLANCO, GRIS,
-                     ROJO_BRILLANTE, VERDE_BRILLANTE, AMARILLO_BRILLANTE, AZUL_BRILLANTE, MAGENTA_BRILLANTE, CYAN_BRILLANTE, BLANCO_BRILLANTE]:
-            linea_plana = linea_plana.replace(code, "")
-        padding = (ancho - 4) - len(linea_plana)
-        if padding < 0:
-            padding = 0
-        print(f"  {c}│{RESET}  {linea}{' ' * padding}{c}│{RESET}")
-    print(f"  {c}╰{'─' * (ancho - 2)}╯{RESET}\n")
+    print(f"  {c}│{BOLD}{titulo_formateado.center(ancho_interno)}{RESET}{c}│{RESET}")
+    print(f"  {c}├{'─' * ancho_interno}┤{RESET}")
+    for l in lineas_procesadas:
+        l_plana = quitar_ansi(l)
+        if len(l_plana) > max_line_w:
+            l = l[:max_line_w - 3] + "..."
+            l_plana = quitar_ansi(l)
+        padding = max_line_w - len(l_plana)
+        print(f"  {c}│{RESET}  {l}{' ' * padding}  {c}│{RESET}")
+    print(f"  {c}╰{'─' * ancho_interno}╯{RESET}\n")
+
+
+def leer_pin_enmascarado(prompt="Contraseña / PIN de seguridad"):
+    """
+    Lee una contraseña o PIN enmascarando los caracteres con puntos ('•').
+    Soporta Backspace para borrar y Ctrl+C para interrumpir.
+    En entornos interactivos de Windows usa msvcrt; de lo contrario utiliza getpass/input.
+    """
+    prompt_str = f"  {CYAN}▸{RESET} {prompt}: "
+    if sys.platform == "win32" and sys.stdin.isatty():
+        import msvcrt
+        print(prompt_str, end="", flush=True)
+        caracteres = []
+        while True:
+            try:
+                ch = msvcrt.getch()
+            except (KeyboardInterrupt, EOFError):
+                print()
+                raise KeyboardInterrupt
+
+            if ch in (b"\r", b"\n"):
+                print()
+                break
+            elif ch == b"\x08":  # Backspace
+                if caracteres:
+                    caracteres.pop()
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+            elif ch == b"\x03":  # Ctrl+C
+                print()
+                raise KeyboardInterrupt
+            elif ch in (b"\x00", b"\xe0"):  # Teclas especiales de función / flechas
+                msvcrt.getch()
+            else:
+                try:
+                    char_decoded = ch.decode("utf-8")
+                    caracteres.append(char_decoded)
+                    sys.stdout.write("•")
+                    sys.stdout.flush()
+                except UnicodeDecodeError:
+                    pass
+        return "".join(caracteres).strip()
+    else:
+        import getpass
+        try:
+            return getpass.getpass(prompt_str).strip()
+        except Exception:
+            return input(prompt_str).strip()
 
 
 def confirmar(mensaje):

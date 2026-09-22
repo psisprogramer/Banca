@@ -11,7 +11,7 @@ from ui import (
 from validaciones import (
     leer_nombre_validado, leer_cedula_validada, leer_usuario_validado,
     leer_contrasena_confirmada, leer_monto_monetario, leer_texto_simple, normalizar_y_validar_nombre,
-    validar_cedula, validar_usuario, parsear_monto
+    validar_cedula, validar_usuario, parsear_monto, validar_cedula_global
 )
 
 
@@ -27,8 +27,8 @@ def registrar_nuevo_cliente(banco_db):
     cabecera_menu("Registro Asistido de Cliente", banco_db.sesion_actual.get("tipo"), banco_db.sesion_actual.get("nombre"))
     print(f"  {GRIS}Ingrese la información verificada del nuevo cliente:{RESET}\n")
 
-    # 1. Cédula: 9 a 10 dígitos, no duplicada
-    cedula = leer_cedula_validada("Número de Cédula (9 a 10 dígitos)", tabla_clientes=banco_db.tabla_clientes)
+    # 1. Cédula: 9 a 10 dígitos, no duplicada a nivel global
+    cedula = leer_cedula_validada("Número de Cédula (9 a 10 dígitos)", banco_db=banco_db)
 
     # 2. Nombre: Organizado a mayúsculas, nombre y apellido obligatorios
     nombre = leer_nombre_validado("Nombre Completo (Nombre y Apellido)")
@@ -183,12 +183,9 @@ def submenu_gestion_clientes(banco_db):
                 if not entrada:
                     nueva_cedula = cedula_ant
                     break
-                valido, res = validar_cedula(entrada)
+                valido, res = validar_cedula_global(entrada, banco_db=banco_db, excluir_cedula=cedula_ant)
                 if not valido:
                     print(f"    {ROJO}{res}{RESET}")
-                    continue
-                if res != cedula_ant and banco_db.tabla_clientes.buscar(res):
-                    print(f"    {ROJO}La cédula {res} ya está en uso por otro cliente.{RESET}")
                     continue
                 nueva_cedula = res
                 break

@@ -53,28 +53,32 @@ def obtener_usuarios_defecto():
             "tipo": "administrador",
             "nombre": "ADMINISTRADOR GENERAL",
             "cedula": "1000000001",
-            "pin": "1234"
+            "pin": "1234",
+            "activo": True
         },
         "asesor": {
             "usuario": "asesor",
             "tipo": "asesor",
             "nombre": "CARLOS ASESOR BANCARIO",
             "cedula": "1000000002",
-            "pin": "1234"
+            "pin": "1234",
+            "activo": True
         },
         "empleado1": {
             "usuario": "empleado1",
             "tipo": "empleado",
             "nombre": "JORGE SALAS",
             "cedula": "1000000004",
-            "pin": "1234"
+            "pin": "1234",
+            "activo": True
         },
         "valen": {
             "usuario": "valen",
             "tipo": "cliente",
             "nombre": "VALENTINA MORALES",
             "cedula": "1000000003",
-            "pin": "1234"
+            "pin": "1234",
+            "activo": True
         }
     }
 

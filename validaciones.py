@@ -60,17 +60,49 @@ def validar_cedula(texto):
     return True, cedula_limpia
 
 
-def leer_cedula_validada(prompt="Número de Cédula (9 a 10 dígitos)", tabla_clientes=None):
-    """Lee la cédula asegurando 9-10 dígitos y que no esté duplicada si se provee la tabla."""
+def validar_cedula_global(cedula, banco_db=None, excluir_cedula=None):
+    """
+    Valida formato numérico de cédula (9-10 dígitos) y comprueba que no
+    se encuentre duplicada en ningún lugar del sistema (clientes o usuarios internos).
+    Retorna (es_valido, cedula_limpia_o_error).
+    """
+    valido, res = validar_cedula(cedula)
+    if not valido:
+        return False, res
+
+    cedula_limpia = res
+    if banco_db is not None:
+        if excluir_cedula and str(excluir_cedula).strip() == cedula_limpia:
+            return True, cedula_limpia
+
+        # 1. Comprobar en tabla de clientes
+        cli = banco_db.tabla_clientes.buscar(cedula_limpia)
+        if cli:
+            return False, f"La cédula {cedula_limpia} ya se encuentra registrada para el cliente '{cli.get('nombre', 'Sin Nombre')}'."
+
+        # 2. Comprobar en tabla de usuarios (clientes, empleados, asesores, administradores)
+        for u in banco_db.tabla_usuarios.listar_valores():
+            if str(u.get("cedula", "")).strip() == cedula_limpia:
+                rol = u.get("tipo", "usuario").capitalize()
+                return False, f"La cédula {cedula_limpia} ya está registrada en el sistema (asociada al {rol} '{u.get('nombre', u.get('usuario'))}')."
+
+    return True, cedula_limpia
+
+
+def leer_cedula_validada(prompt="Número de Cédula (9 a 10 dígitos)", tabla_clientes=None, banco_db=None, excluir_cedula=None):
+    """Lee la cédula asegurando 9-10 dígitos y que no esté duplicada globalmente."""
     while True:
         entrada = input(f"  {CYAN}▸{RESET} {prompt}: ").strip()
-        valido, resultado = validar_cedula(entrada)
+        if banco_db is not None:
+            valido, resultado = validar_cedula_global(entrada, banco_db=banco_db, excluir_cedula=excluir_cedula)
+        else:
+            valido, resultado = validar_cedula(entrada)
+            if valido and tabla_clientes and tabla_clientes.buscar(resultado):
+                valido = False
+                resultado = f"La cédula {resultado} ya se encuentra registrada en el sistema."
+
         if not valido:
             print(f"    {ROJO}{resultado}{RESET}")
-            continue
-
-        if tabla_clientes and tabla_clientes.buscar(resultado):
-            print(f"    {ROJO}La cédula {resultado} ya se encuentra registrada en el sistema.{RESET}")
             continue
 
         return resultado
@@ -222,3 +254,72 @@ def leer_texto_simple(prompt, obligatorio=True):
             print(f"    {ROJO}Este campo no puede estar vacío.{RESET}")
             continue
         return valor
+
+
+def validar_tasa_interes(texto, categoria="General"):
+    """
+    Valida y normaliza de forma estricta el ingreso de tasas de interés o costos:
+    - Para Créditos e Inversión: exige tasa porcentual numérica entre 0.01% y 45.0% M.V. o E.A.
+    - Para Cuentas y Servicios: admite porcentajes o tarifas estructuradas (ej: $0 COP).
+    Retorna (es_valido, tasa_formateada_o_error, valor_float_si_aplica).
+    """
+    if not texto or not str(texto).strip():
+        return False, "La tasa o costo asociado no puede estar vacía.", None
+
+    s = str(texto).strip()
+
+    # Si es tarifa gratuita o fija en pesos
+    if any(k in s.lower() for k in ["$0", "gratis", "sin costo", "0 cop", "tarifa cero"]):
+        return True, "$0 COP de tarifa", 0.0
+
+    # Limpieza de sufijos porcentuales para parseo numérico
+    s_num = s.replace("%", "").replace("M.V.", "").replace("E.A.", "").replace("m.v.", "").replace("e.a.", "")
+    s_num = s_num.replace("mensual", "").replace("anual", "").replace("nominal", "").strip()
+    s_num = s_num.replace(",", ".")
+
+    try:
+        val = float(s_num)
+    except ValueError:
+        cat_lower = categoria.lower()
+        if any(c in cat_lower for c in ["crédito", "credito", "inversión", "inversion"]):
+            return False, "Para créditos e inversión debe ingresar un porcentaje numérico válido (ej: 1.75 o 1.75% M.V.).", None
+        else:
+            return True, s, None
+
+    if val < 0.0:
+        return False, "La tasa de interés no puede ser un valor negativo.", None
+
+    cat_lower = categoria.lower()
+    if any(c in cat_lower for c in ["crédito", "credito"]):
+        if val > 45.0:
+            return False, "La tasa supera el límite legal de usura bancaria (máximo 45% E.A. o 3.50% M.V.).", None
+        if "e.a." in s.lower() or "anual" in s.lower() or val > 6.0:
+            tasa_fmt = f"{val:.2f}% E.A."
+        else:
+            tasa_fmt = f"{val:.2f}% M.V."
+        return True, tasa_fmt, val
+
+    elif any(c in cat_lower for c in ["inversión", "inversion"]):
+        if val > 35.0:
+            return False, "La tasa de rendimiento de inversión no puede exceder el 35% E.A.", None
+        tasa_fmt = f"{val:.2f}% E.A." if "m.v." not in s.lower() else f"{val:.2f}% M.V."
+        return True, tasa_fmt, val
+
+    elif "cuenta" in cat_lower:
+        tasa_fmt = f"{val:.2f}% E.A. sobre saldo diario"
+        return True, tasa_fmt, val
+
+    else:
+        tasa_fmt = f"{val:.2f}% M.V." if "%" in s else (f"{val:.2f}%" if val > 0 else s)
+        return True, tasa_fmt, val
+
+
+def leer_tasa_interes(prompt="Tasa de interés / costo", categoria="General"):
+    """Lectura validada estrictamente de la tasa de interés."""
+    while True:
+        entrada = input(f"  {CYAN}▸{RESET} {prompt}: ").strip()
+        valido, res, num = validar_tasa_interes(entrada, categoria)
+        if not valido:
+            print(f"    {ROJO}{res}{RESET}")
+            continue
+        return res, num
