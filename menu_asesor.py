@@ -10,7 +10,8 @@ from ui import (
 )
 from validaciones import (
     leer_nombre_validado, leer_cedula_validada, leer_usuario_validado,
-    leer_contrasena_confirmada, leer_monto_monetario, leer_texto_simple, normalizar_y_validar_nombre
+    leer_contrasena_confirmada, leer_monto_monetario, leer_texto_simple, normalizar_y_validar_nombre,
+    validar_cedula, validar_usuario, parsear_monto
 )
 
 
@@ -85,7 +86,22 @@ def registrar_nuevo_cliente(banco_db):
     # Persistencia en disco
     banco_db.guardar_clientes()
     banco_db.guardar_usuarios()
-    banco_db.auditoria.apilar(f"Cliente registrado: {nombre} ({cedula})")
+
+    def reversor_registro():
+        banco_db.lista_clientes.eliminar(lambda c: str(c.get("cedula")) == str(cedula))
+        banco_db.tabla_clientes.eliminar(cedula)
+        banco_db.tabla_usuarios.eliminar(usuario)
+        if deposito_inicial > 0:
+            banco_db.historial_transacciones = [
+                t for t in banco_db.historial_transacciones
+                if not (str(t.get("cedula")) == str(cedula) and t.get("tipo") == "Depósito Apertura")
+            ]
+            banco_db.guardar_transacciones()
+        banco_db.guardar_clientes()
+        banco_db.guardar_usuarios()
+        return True
+
+    banco_db.auditoria.apilar(f"Cliente registrado: {nombre} ({cedula})", reversor_registro)
 
     caja_mensaje("exito", "CLIENTE REGISTRADO CON ÉXITO", [
         f"Titular:       {nombre}",
@@ -103,12 +119,13 @@ def submenu_gestion_clientes(banco_db):
         cabecera_menu("Gestión Administrativa de Clientes", banco_db.sesion_actual.get("tipo"), banco_db.sesion_actual.get("nombre"))
         print(f"  {CYAN}1.{RESET} Registrar nuevo cliente {GRIS}(Validaciones estrictas y formato mayúsculas){RESET}")
         print(f"  {CYAN}2.{RESET} Buscar expediente de cliente por cédula")
-        print(f"  {CYAN}3.{RESET} Modificar datos de cliente")
+        print(f"  {CYAN}3.{RESET} Modificar datos de cliente {GRIS}(Todos los campos con confirmación){RESET}")
         print(f"  {CYAN}4.{RESET} Eliminar cliente del sistema {GRIS}(Sincronización total){RESET}")
         print(f"  {CYAN}5.{RESET} Listar directorio de clientes")
+        print(f"  {CYAN}6.{RESET} Deshacer última acción {GRIS}(Pila LIFO de reversión){RESET}")
         print(f"  {ROJO}0.{RESET} Volver al menú de asesor\n")
 
-        op = input(f"  {BOLD}Selecciona una opción [0-5]:{RESET} ").strip()
+        op = input(f"  {BOLD}Selecciona una opción [0-6]:{RESET} ").strip()
 
         if op == "1":
             registrar_nuevo_cliente(banco_db)
@@ -132,37 +149,236 @@ def submenu_gestion_clientes(banco_db):
 
         elif op == "3":
             cabecera_menu("Modificación de Datos de Cliente", banco_db.sesion_actual.get("tipo"), banco_db.sesion_actual.get("nombre"))
-            cedula = leer_texto_simple("Cédula del cliente a modificar")
-            cliente = banco_db.tabla_clientes.buscar(cedula)
+            cedula_buscar = leer_texto_simple("Cédula del cliente a modificar")
+            cliente = banco_db.tabla_clientes.buscar(cedula_buscar)
             if not cliente:
-                print(f"\n  {ROJO}Cliente no encontrado.{RESET}")
+                print(f"\n  {ROJO}Cliente con cédula {cedula_buscar} no encontrado.{RESET}")
                 pausa()
                 continue
 
-            nombre_anterior = cliente["nombre"]
-            print(f"  Nombre actual: {CYAN}{nombre_anterior}{RESET}")
-            nuevo_nombre = leer_nombre_validado("Nuevo nombre completo (Nombre y Apellido)")
+            # Respaldo completo del estado actual del cliente
+            cedula_ant = str(cliente["cedula"])
+            nombre_ant = cliente["nombre"]
+            usuario_ant = cliente["usuario"]
+            pin_ant = cliente["pin"]
+            saldo_ant = float(cliente["saldo"])
 
-            if confirmar(f"¿Confirma modificar el nombre a '{nuevo_nombre}'?"):
-                animacion_timer(0.4, "Actualizando cliente y usuario en JSON")
-                cliente["nombre"] = nuevo_nombre
-                usr_data = banco_db.tabla_usuarios.buscar(cliente["usuario"])
-                if usr_data:
+            usr_data = banco_db.tabla_usuarios.buscar(usuario_ant)
+            usr_ant = dict(usr_data) if usr_data else None
+
+            print(f"\n  {BOLD}DATOS ACTUALES DEL EXPEDIENTE:{RESET}")
+            print(f"  {'─' * 55}")
+            print(f"  • Cédula:            {CYAN}{cedula_ant}{RESET}")
+            print(f"  • Nombre completo:   {CYAN}{nombre_ant}{RESET}")
+            print(f"  • Usuario login:     {CYAN}{usuario_ant}{RESET}")
+            print(f"  • Contraseña / PIN:  {CYAN}{pin_ant}{RESET}")
+            print(f"  • Saldo disponible:  {VERDE_BRILLANTE}{fmt_dinero(saldo_ant)}{RESET}")
+            print(f"  • Productos activos: {GRIS}{', '.join(cliente.get('productos', []))}{RESET}")
+            print(f"  {'─' * 55}")
+            print(f"  {GRIS}(Ingrese el nuevo valor o presione [ENTER] para conservar el actual){RESET}\n")
+
+            # 1. Cédula
+            while True:
+                entrada = input(f"  {CYAN}▸{RESET} Nueva Cédula [{cedula_ant}]: ").strip()
+                if not entrada:
+                    nueva_cedula = cedula_ant
+                    break
+                valido, res = validar_cedula(entrada)
+                if not valido:
+                    print(f"    {ROJO}{res}{RESET}")
+                    continue
+                if res != cedula_ant and banco_db.tabla_clientes.buscar(res):
+                    print(f"    {ROJO}La cédula {res} ya está en uso por otro cliente.{RESET}")
+                    continue
+                nueva_cedula = res
+                break
+
+            # 2. Nombre completo
+            while True:
+                entrada = input(f"  {CYAN}▸{RESET} Nuevo Nombre Completo [{nombre_ant}]: ").strip()
+                if not entrada:
+                    nuevo_nombre = nombre_ant
+                    break
+                valido, res = normalizar_y_validar_nombre(entrada)
+                if not valido:
+                    print(f"    {ROJO}{res}{RESET}")
+                    continue
+                nuevo_nombre = res
+                break
+
+            # 3. Usuario login
+            while True:
+                entrada = input(f"  {CYAN}▸{RESET} Nuevo Usuario login [{usuario_ant}]: ").strip()
+                if not entrada:
+                    nuevo_usuario = usuario_ant
+                    break
+                valido, res = validar_usuario(entrada)
+                if not valido:
+                    print(f"    {ROJO}{res}{RESET}")
+                    continue
+                if res != usuario_ant and banco_db.tabla_usuarios.buscar(res):
+                    print(f"    {ROJO}El nombre de usuario '{res}' ya está en uso. Elija otro.{RESET}")
+                    continue
+                nuevo_usuario = res
+                break
+
+            # 4. Contraseña / PIN
+            while True:
+                entrada = input(f"  {CYAN}▸{RESET} Nueva Contraseña / PIN [{pin_ant}]: ").strip()
+                if not entrada:
+                    nuevo_pin = pin_ant
+                    break
+                if len(entrada) < 4:
+                    print(f"    {ROJO}La contraseña / PIN debe tener al menos 4 caracteres.{RESET}")
+                    continue
+                conf = input(f"  {CYAN}▸{RESET} Confirme la nueva contraseña / PIN: ").strip()
+                if entrada != conf:
+                    print(f"    {ROJO}Las contraseñas no coinciden. Intente nuevamente.{RESET}")
+                    continue
+                nuevo_pin = entrada
+                break
+
+            # 5. Saldo disponible
+            while True:
+                entrada = input(f"  {CYAN}▸{RESET} Nuevo Saldo disponible [{fmt_dinero(saldo_ant)}]: ").strip()
+                if not entrada:
+                    nuevo_saldo = saldo_ant
+                    break
+                try:
+                    val = parsear_monto(entrada)
+                    if val < 0:
+                        print(f"    {ROJO}El saldo no puede ser un valor negativo.{RESET}")
+                        continue
+                    nuevo_saldo = val
+                    break
+                except (ValueError, TypeError):
+                    print(f"    {ROJO}Monto no válido. Ingrese un valor numérico (ej: 5000000 o 5.000.000).{RESET}")
+
+            # Lista de modificaciones efectuadas
+            cambios = []
+            if nueva_cedula != cedula_ant:
+                cambios.append(("Cédula", cedula_ant, nueva_cedula))
+            if nuevo_nombre != nombre_ant:
+                cambios.append(("Nombre", nombre_ant, nuevo_nombre))
+            if nuevo_usuario != usuario_ant:
+                cambios.append(("Usuario", usuario_ant, nuevo_usuario))
+            if nuevo_pin != pin_ant:
+                cambios.append(("PIN / Contraseña", pin_ant, nuevo_pin))
+            if nuevo_saldo != saldo_ant:
+                cambios.append(("Saldo", fmt_dinero(saldo_ant), fmt_dinero(nuevo_saldo)))
+
+            if not cambios:
+                print(f"\n  {AMARILLO}No se ingresó ninguna modificación. Se conservan los datos originales.{RESET}")
+                pausa()
+                continue
+
+            # Mostrar resumen comparativo
+            print("\n" + "─" * 65)
+            print(f"  {BOLD}{'CAMPO':<18} | {'VALOR ANTERIOR':<20} | {'NUEVO VALOR'}{RESET}")
+            print("─" * 65)
+            for c_nom, c_ant, c_nuev in cambios:
+                print(f"  {c_nom:<18} | {c_ant:<20} | {VERDE_BRILLANTE}{c_nuev}{RESET}")
+            print("─" * 65 + "\n")
+
+            # Confirmación final obligatoria
+            if not confirmar(f"¿Confirma aplicar y guardar estas modificaciones en el cliente '{nuevo_nombre}'?"):
+                print(f"\n  {AMARILLO}Actualización cancelada por el asesor. Ningún cambio fue guardado.{RESET}")
+                pausa()
+                continue
+
+            animacion_timer(0.4, "Actualizando cliente y sincronizando archivos JSON")
+
+            # Aplicación en memoria
+            cliente["cedula"] = nueva_cedula
+            cliente["nombre"] = nuevo_nombre
+            cliente["usuario"] = nuevo_usuario
+            cliente["pin"] = nuevo_pin
+            cliente["saldo"] = nuevo_saldo
+
+            # Reindexación en tabla_clientes si la cédula cambió
+            if nueva_cedula != cedula_ant:
+                banco_db.tabla_clientes.eliminar(cedula_ant)
+                banco_db.tabla_clientes.insertar(nueva_cedula, cliente)
+                for idx, t in enumerate(banco_db.turnos._items):
+                    if t == cedula_ant:
+                        banco_db.turnos._items[idx] = nueva_cedula
+                for tx in banco_db.historial_transacciones:
+                    if str(tx.get("cedula")) == cedula_ant:
+                        tx["cedula"] = nueva_cedula
+                        tx["nombre"] = nuevo_nombre
+                banco_db.guardar_transacciones()
+
+            # Actualización en tabla_usuarios
+            if usr_data:
+                if nuevo_usuario != usuario_ant:
+                    banco_db.tabla_usuarios.eliminar(usuario_ant)
+                    usr_data["usuario"] = nuevo_usuario
                     usr_data["nombre"] = nuevo_nombre
+                    usr_data["cedula"] = nueva_cedula
+                    usr_data["pin"] = nuevo_pin
+                    banco_db.tabla_usuarios.insertar(nuevo_usuario, usr_data)
+                else:
+                    usr_data["nombre"] = nuevo_nombre
+                    usr_data["cedula"] = nueva_cedula
+                    usr_data["pin"] = nuevo_pin
+            else:
+                nuevo_usr_dict = {
+                    "usuario": nuevo_usuario,
+                    "tipo": "cliente",
+                    "nombre": nuevo_nombre,
+                    "cedula": nueva_cedula,
+                    "pin": nuevo_pin
+                }
+                banco_db.tabla_usuarios.insertar(nuevo_usuario, nuevo_usr_dict)
+
+            # Persistencia en archivos JSON
+            banco_db.guardar_clientes()
+            banco_db.guardar_usuarios()
+
+            # Función de reversión para la pila LIFO
+            def reversor_modificacion():
+                cliente["cedula"] = cedula_ant
+                cliente["nombre"] = nombre_ant
+                cliente["usuario"] = usuario_ant
+                cliente["pin"] = pin_ant
+                cliente["saldo"] = saldo_ant
+
+                if nueva_cedula != cedula_ant:
+                    banco_db.tabla_clientes.eliminar(nueva_cedula)
+                    banco_db.tabla_clientes.insertar(cedula_ant, cliente)
+                    for idx, t in enumerate(banco_db.turnos._items):
+                        if t == nueva_cedula:
+                            banco_db.turnos._items[idx] = cedula_ant
+                    for tx in banco_db.historial_transacciones:
+                        if str(tx.get("cedula")) == nueva_cedula:
+                            tx["cedula"] = cedula_ant
+                            tx["nombre"] = nombre_ant
+                    banco_db.guardar_transacciones()
+
+                if nuevo_usuario != usuario_ant:
+                    banco_db.tabla_usuarios.eliminar(nuevo_usuario)
+                    if usr_ant:
+                        banco_db.tabla_usuarios.insertar(usuario_ant, usr_ant)
+                else:
+                    if usr_ant:
+                        u = banco_db.tabla_usuarios.buscar(usuario_ant)
+                        if u:
+                            u.update(usr_ant)
 
                 banco_db.guardar_clientes()
                 banco_db.guardar_usuarios()
+                return True
 
-                def reversor():
-                    cliente["nombre"] = nombre_anterior
-                    if usr_data:
-                        usr_data["nombre"] = nombre_anterior
-                    banco_db.guardar_clientes()
-                    banco_db.guardar_usuarios()
-                    return True
+            banco_db.auditoria.apilar(f"Modificación cliente {cedula_ant} ({nombre_ant})", reversor_modificacion)
 
-                banco_db.auditoria.apilar(f"Modificado nombre {cedula} a {nuevo_nombre}", reversor)
-                caja_mensaje("exito", "DATOS ACTUALIZADOS", [f"Nuevo nombre: {nuevo_nombre}"])
+            caja_mensaje("exito", "DATOS ACTUALIZADOS", [
+                f"Titular:       {nuevo_nombre}",
+                f"Cédula:        {nueva_cedula}",
+                f"Usuario:       {nuevo_usuario}",
+                f"PIN:           {nuevo_pin}",
+                f"Saldo:         {fmt_dinero(nuevo_saldo)}",
+                f"Sincronizados {len(cambios)} campo(s) en memoria y archivos JSON."
+            ])
             pausa()
 
         elif op == "4":
@@ -177,16 +393,34 @@ def submenu_gestion_clientes(banco_db):
             if confirmar(f"{ROJO_BRILLANTE}¿Está totalmente seguro de ELIMINAR al cliente {cliente['nombre']} ({cedula})?{RESET}"):
                 animacion_timer(0.4, "Eliminando registros asociados y cancelando turnos")
                 usr = cliente.get("usuario")
+                usr_data = banco_db.tabla_usuarios.buscar(usr) if usr else None
+
+                cliente_respaldo = dict(cliente)
+                usr_respaldo = dict(usr_data) if usr_data else None
+                tenia_turno = banco_db.turnos.contiene(cedula)
+
                 banco_db.lista_clientes.eliminar(lambda c: str(c["cedula"]) == str(cedula))
                 banco_db.tabla_clientes.eliminar(cedula)
                 if usr:
                     banco_db.tabla_usuarios.eliminar(usr)
-                if banco_db.turnos.contiene(cedula):
+                if tenia_turno:
                     banco_db.turnos.eliminar(cedula)
 
                 banco_db.guardar_clientes()
                 banco_db.guardar_usuarios()
-                banco_db.auditoria.apilar(f"Cliente eliminado: {cliente['nombre']} ({cedula})")
+
+                def reversor_elim():
+                    banco_db.tabla_clientes.insertar(cliente_respaldo["cedula"], cliente_respaldo)
+                    banco_db.lista_clientes.insertar_final(cliente_respaldo)
+                    if usr_respaldo:
+                        banco_db.tabla_usuarios.insertar(usr_respaldo["usuario"], usr_respaldo)
+                    if tenia_turno:
+                        banco_db.turnos.encolar(cliente_respaldo["cedula"])
+                    banco_db.guardar_clientes()
+                    banco_db.guardar_usuarios()
+                    return True
+
+                banco_db.auditoria.apilar(f"Cliente eliminado: {cliente['nombre']} ({cedula})", reversor_elim)
 
                 caja_mensaje("exito", "CLIENTE ELIMINADO", [
                     f"El cliente {cliente['nombre']} fue retirado con éxito del sistema.",
@@ -205,6 +439,14 @@ def submenu_gestion_clientes(banco_db):
                 for c in todos:
                     print(f"  {c['cedula']:<12} | {c['nombre']:<28} | {c['usuario']:<14} | {fmt_dinero(c['saldo'])}")
                 print(f"\n  {GRIS}Total de clientes registrados: {len(todos)}{RESET}")
+            pausa()
+
+        elif op == "6":
+            cabecera_menu("Deshacer Última Operación", banco_db.sesion_actual.get("tipo"), banco_db.sesion_actual.get("nombre"))
+            animacion_timer(0.4, "Verificando pila LIFO de reversión")
+            exito, msj = banco_db.auditoria.deshacer_ultima()
+            tipo_caja = "exito" if exito else "alerta"
+            caja_mensaje(tipo_caja, "RESULTADO DE DESHACER", [msj])
             pausa()
 
         elif op == "0":
@@ -274,7 +516,22 @@ def submenu_solicitudes_credito(banco_db):
                         banco_db.guardar_clientes()
 
                     banco_db.guardar_solicitudes()
-                    banco_db.auditoria.apilar(f"Crédito aprobado: {solicitud['nombre']} - {fmt_dinero(solicitud['monto'])}")
+                    
+                    def reversor_credito_aprobado():
+                        cli = banco_db.tabla_clientes.buscar(solicitud["cedula"])
+                        if cli:
+                            cli["saldo"] -= solicitud["monto"]
+                            banco_db.guardar_clientes()
+                        banco_db.solicitudes_credito.insertar(solicitud, solicitud.get("riesgo", 30))
+                        banco_db.guardar_solicitudes()
+                        banco_db.historial_transacciones = [
+                            t for t in banco_db.historial_transacciones
+                            if not (str(t.get("cedula")) == str(solicitud["cedula"]) and t.get("tipo") == "Desembolso Crédito" and float(t.get("monto", 0)) == float(solicitud["monto"]))
+                        ]
+                        banco_db.guardar_transacciones()
+                        return True
+
+                    banco_db.auditoria.apilar(f"Crédito aprobado: {solicitud['nombre']} - {fmt_dinero(solicitud['monto'])}", reversor_credito_aprobado)
 
                     caja_mensaje("exito", "CRÉDITO APROBADO", [
                         f"Monto desembolsado: {fmt_dinero(solicitud['monto'])}",
@@ -289,7 +546,13 @@ def submenu_solicitudes_credito(banco_db):
                 if confirmar("¿Confirma el RECHAZO definitivo de la solicitud?"):
                     animacion_timer(0.4, "Registrando dictamen de rechazo en auditoría")
                     banco_db.guardar_solicitudes()
-                    banco_db.auditoria.apilar(f"Crédito rechazado: {solicitud['nombre']} ({solicitud['producto']})")
+
+                    def reversor_credito_rechazado():
+                        banco_db.solicitudes_credito.insertar(solicitud, solicitud.get("riesgo", 30))
+                        banco_db.guardar_solicitudes()
+                        return True
+
+                    banco_db.auditoria.apilar(f"Crédito rechazado: {solicitud['nombre']} ({solicitud['producto']})", reversor_credito_rechazado)
                     caja_mensaje("error", "SOLICITUD RECHAZADA", [
                         f"La solicitud de {solicitud['nombre']} ha sido rechazada."
                     ])

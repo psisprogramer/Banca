@@ -168,12 +168,22 @@ class PilaLIFO:
 
     def deshacer_ultima(self):
         if not self._items:
-            return False, "No hay acciones registradas para deshacer."
-        accion = self._items.pop()
-        exito = accion.deshacer()
-        if exito:
-            return True, f"Revertido con éxito: {accion.descripcion}"
-        return False, f"Se extrajo la acción pero no fue posible revertir: {accion.descripcion}"
+            return False, "No hay acciones registradas en el historial de auditoría."
+
+        # Busca en orden LIFO (de la más reciente a la más antigua) la última acción reversible
+        for i in range(len(self._items) - 1, -1, -1):
+            accion = self._items[i]
+            if accion.funcion_deshacer is not None:
+                self._items.pop(i)
+                try:
+                    exito = accion.deshacer()
+                    if exito:
+                        return True, f"Revertido con éxito: {accion.descripcion}"
+                    return False, f"La operación no pudo ser revertida: {accion.descripcion}"
+                except Exception as e:
+                    return False, f"Error al revertir '{accion.descripcion}': {str(e)}"
+
+        return False, "No hay acciones reversibles pendientes en la pila (los eventos registrados son informativos)."
 
     def ver_historial(self):
         return list(reversed(self._items))
