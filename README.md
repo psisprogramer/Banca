@@ -254,12 +254,10 @@ El sistema incluye cuentas precargadas en `data/usuarios.json` listas para reali
 
 | Rol | Usuario | Contraseña / PIN | Nombre Titular | Cédula | Características de Prueba |
 | :--- | :--- | :---: | :--- | :---: | :--- |
-| **Administrador** | `admin` | `1234` | ADMINISTRADOR GENERAL | `1000000001` | Acceso al panel de control, gestión de productos, tasas, auditoría y reportes matriciales. |
-| **Asesor** | `asesor` | `1234` | CARLOS ASESOR BANCARIO | `1000000002` | Acceso a ventanilla de turnos, comités de crédito, CRUD de clientes y reversión (*Undo*). |
+
 | **Empleado** | `empleado1` | `1234` | JORGE SALAS | `1000000004` | Funciones operativas de apoyo comercial. |
 | **Cliente** | `valen` | `1234` | VALENTINA MORALES | `1000000003` | Cuenta activa con saldo (\$235,000,000 COP), tarjeta y movimientos registrados. |
 | **Cliente** | `andrescastro01` | `5678` | ANDRES FELIPE CASTRO | `1098765432` | Cuenta activa con saldo (\$20,000,000 COP). |
-| **Cliente** | `caro3456` | `1234` | CAROLINA MOLINA PEREZ | `1000382808` | Cuenta con movimientos transaccionales previos. |
 
 *Nota: Cualquier cliente registrado desde el menú principal o por un asesor podrá iniciar sesión inmediatamente con el usuario y contraseña asignados.*
 
