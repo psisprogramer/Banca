@@ -222,6 +222,59 @@ class ColaPrioridad:
         self._heap.clear()
         self._contador = 0
 
+PRIORIDADES_TURNO = {
+    1: "Discapacidad",
+    2: "Adulto mayor",
+    3: "Embarazada",
+}
+ 
+ 
+class ColaPrioridadTurnos(ColaPrioridad):
+    """
+    Fila prioritaria de turnos presenciales (Min-Heap).
+    Cada elemento se guarda como (prioridad, orden_llegada, cedula):
+      - menor prioridad  -> se atiende primero
+      - igual prioridad  -> se atiende por orden de llegada (FIFO)
+    Extiende ColaPrioridad sin modificarla, por lo que la cola de
+    solicitudes de crédito sigue funcionando igual.
+    """
+ 
+    def contiene(self, item):
+        """True si la cédula está en la fila prioritaria."""
+        return any(it == item for _, _, it in self._heap)
+ 
+    def posicion(self, item):
+        """Posición (base 1) dentro de esta fila, o 0 si no está."""
+        for i, (_, _, it) in enumerate(sorted(self._heap), start=1):
+            if it == item:
+                return i
+        return 0
+ 
+    def extraer_con_datos(self):
+        """Extrae el siguiente y devuelve (prioridad, orden_llegada, item), o None si está vacía."""
+        return heapq.heappop(self._heap) if self._heap else None
+ 
+    def reinsertar(self, prioridad, orden, item):
+        """Devuelve un elemento a la fila conservando su orden de llegada original (para Deshacer)."""
+        heapq.heappush(self._heap, (prioridad, orden, item))
+ 
+    def eliminar(self, item):
+        """Saca un elemento por valor. Devuelve (prioridad, orden, item) o None si no estaba."""
+        for t in self._heap:
+            if t[2] == item:
+                self._heap.remove(t)
+                heapq.heapify(self._heap)
+                return t
+        return None
+ 
+    def reemplazar(self, item_viejo, item_nuevo):
+        """Cambia el identificador (cédula) conservando prioridad y orden de llegada."""
+        self._heap = [
+            (p, o, item_nuevo if it == item_viejo else it)
+            for p, o, it in self._heap
+        ]
+        heapq.heapify(self._heap)
+
 
 class TablaHash:
     """Tabla Hash con encadenamiento por buckets y rehashing dinámico."""

@@ -6,7 +6,7 @@ Banco Digital - Sistema Central
 import os
 import json
 import datetime
-from estructuras import ListaDoble, TablaHash, ColaFIFO, PilaLIFO, ColaPrioridad, Matriz
+from estructuras import ListaDoble, TablaHash, ColaFIFO, PilaLIFO, ColaPrioridad, ColaPrioridadTurnos, Matriz
 
 CARPETA_DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -208,6 +208,7 @@ class EstadoSistema:
         self.tabla_usuarios = TablaHash()
         self.catalogo_productos = ListaDoble()
         self.turnos = ColaFIFO()
+        self.turnos_prioritarios = ColaPrioridadTurnos()
         self.auditoria = PilaLIFO()
         self.solicitudes_credito = ColaPrioridad()
         self.matriz_riesgo = Matriz()
@@ -321,6 +322,18 @@ class EstadoSistema:
         ced = str(cedula)
         txs = [t for t in self.historial_transacciones if str(t.get("cedula")) == ced]
         return txs[-limite:]
+
+    def total_turnos(self):
+        """Turnos en espera: fila prioritaria + fila normal."""
+        return self.turnos.tamano() + self.turnos_prioritarios.tamano()
+
+    def posicion_turno(self, cedula):
+        """Posición real de atención (base 1): primero la prioritaria, luego la normal. 0 si no tiene turno."""
+        if self.turnos_prioritarios.contiene(cedula):
+            return self.turnos_prioritarios.posicion(cedula)
+        if self.turnos.contiene(cedula):
+            return self.turnos_prioritarios.tamano() + self.turnos.posicion(cedula)
+        return 0
 
     def guardar_productos(self):
         prods = self.catalogo_productos.to_list()

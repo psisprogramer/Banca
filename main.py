@@ -21,7 +21,6 @@ from menu_cliente import menu_cliente
 from menu_asesor import menu_asesor, registrar_nuevo_cliente
 from menu_admin import menu_administrador
 
-
 def iniciar_sesion():
     cabecera_menu("Inicio de Sesión")
     print(f"  {GRIS}Ingrese sus credenciales registradas:{RESET}\n")

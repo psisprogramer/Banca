@@ -228,7 +228,8 @@ def submenu_reportes_gerenciales(banco_db):
         elif op == "3":
             cabecera_menu("Indicadores Clave de Desempeño (KPIs)", sesion.get("tipo"), sesion.get("nombre"))
             total_clientes = banco_db.lista_clientes.tamano
-            turnos_espera = banco_db.turnos.tamano()
+            turnos_espera = banco_db.total_turnos()
+            turnos_prioritarios = banco_db.turnos_prioritarios.tamano()
             creditos_espera = banco_db.solicitudes_credito.tamano()
             total_usuarios = banco_db.tabla_usuarios.cantidad_elementos
             total_txs = len(banco_db.historial_transacciones)
@@ -238,6 +239,7 @@ def submenu_reportes_gerenciales(banco_db):
                 f"Usuarios en el sistema:        {BOLD}{total_usuarios}{RESET}",
                 f"Transacciones en JSON:         {BOLD}{total_txs}{RESET}",
                 f"Turnos en fila virtual:        {BOLD}{turnos_espera}{RESET}",
+                f"  de los cuales prioritarios:  {BOLD}{turnos_prioritarios}{RESET}",
                 f"Solicitudes crédito en cola:   {BOLD}{creditos_espera}{RESET}",
                 f"Eventos en auditoría LIFO:     {BOLD}{banco_db.auditoria.tamano()}{RESET}"
             ])

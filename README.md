@@ -1,10 +1,10 @@
 # 🏦 Sistema Bancario Digital — Plataforma Central Bancaria
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg?logo=python&logoColor=white)
-![Paradigma](https://img.shields.io/badge/Paradigma-Modular%20%7C%20EDyA-emerald.svg)
-![Persistencia](https://img.shields.io/badge/Persistencia-JSON%20Desacoplado-orange.svg)
-![Interfaz](https://img.shields.io/badge/Interfaz-TUI%20ANSI%20Interactiva-purple.svg)
-![Licencia](https://img.shields.io/badge/Licencia-Educativa%20%2F%20MIT-lightgrey.svg)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Paradigma](https://img.shields.io/badge/Paradigma-Modular%20%7C%20EDyA-emerald.svg)](#-estructuras-de-datos-implementadas-dsa)
+[![Persistencia](https://img.shields.io/badge/Persistencia-JSON%20Desacoplado-orange.svg)](#-capa-de-persistencia-y-estructura-de-datos-json)
+[![Interfaz](https://img.shields.io/badge/Interfaz-TUI%20ANSI%20Interactiva-purple.svg)](#-instalación-y-guía-de-uso)
+[![Licencia](https://img.shields.io/badge/Licencia-Educativa%20%2F%20MIT-lightgrey.svg)](#️-autoría-y-propósito-académico)
 
 Una plataforma bancaria digital integral desarrollada en **Python**, diseñada para simular las operaciones centrales (*Core Banking*) de una entidad financiera moderna. El sistema implementa **Estructuras de Datos y Algoritmos (EDyA / DSA)** construidos de forma nativa (listas doblemente enlazadas, colas FIFO, pilas LIFO con capacidad de deshacer operaciones, colas de prioridad basadas en montículos binarios, tablas hash con encadenamiento dinámico y matrices dispersas bidimensionales), acoplados a un motor de persistencia en archivos **JSON** y una interfaz interactiva de consola (**TUI**) con soporte ANSI enriquecido.
 
@@ -15,6 +15,7 @@ Una plataforma bancaria digital integral desarrollada en **Python**, diseñada p
 - [Visión General](#-visión-general)
 - [Arquitectura del Sistema](#-arquitectura-del-sistema)
 - [Estructuras de Datos Implementadas (DSA)](#-estructuras-de-datos-implementadas-dsa)
+- [Fila Prioritaria de Turnos](#-fila-prioritaria-de-turnos)
 - [Analítica de Riesgo y Operaciones Matriciales](#-analítica-de-riesgo-y-operaciones-matriciales)
 - [Roles y Funcionalidades del Sistema](#-roles-y-funcionalidades-del-sistema)
   - [1. Portal Público / Visitante](#1-portal-público--visitante)
@@ -45,7 +46,7 @@ El **Sistema Bancario Digital** aborda de manera coordinada cuatro pilares de la
 ```mermaid
 flowchart TD
     subgraph UI_Layer [Capa de Presentación e Interacción]
-        A[banco_menu.py - Orquestador Central]
+        A[main.py - Orquestador Central]
         U[ui.py - Formato ANSI, Tablas y Banners]
         V[validaciones.py - Parser Monetario y Sanitización]
     end
@@ -86,13 +87,42 @@ En el archivo [`estructuras.py`](estructuras.py) se implementan desde cero, sin 
 | Estructura | Clase en Código | Aplicación en el Negocio Bancario | Complejidad Temporal Promedio |
 | :--- | :--- | :--- | :---: |
 | **Lista Doblemente Enlazada** | `ListaDoble` / `NodoDoble` | Gestión del portafolio comercial de productos y directorio secuencial de clientes. Soporta recorridos bidireccionales (`recorrer_adelante` / `recorrer_atras`). | Inserción: $O(1)$<br>Búsqueda: $O(n)$<br>Eliminación: $O(1)^*$ |
-| **Cola FIFO** | `ColaFIFO` | Fila virtual de turnos de atención presencial en sucursal. Los clientes se atienden en estricto orden de llegada. Cuenta con soporte para reinsertar al frente (`encolar_frente`) en caso de reversión. | Encolar: $O(1)$<br>Desencolar: $O(1)$ |
+| **Cola FIFO** | `ColaFIFO` | Fila virtual de **turnos generales** de atención presencial en sucursal. Los clientes sin categoría de atención prioritaria se atienden en estricto orden de llegada. Cuenta con soporte para reinsertar al frente (`encolar_frente`) en caso de reversión. | Encolar: $O(1)$<br>Desencolar: $O(1)$ |
 | **Pila LIFO** | `PilaLIFO` / `AccionReversible` | Pila de auditoría del sistema y control de reversión (*Undo*). Permite registrar funciones *callback* reversoras y desapilar para revertir operaciones en caliente. | Apilar: $O(1)$<br>Desapilar: $O(1)$ |
 | **Cola de Prioridad** | `ColaPrioridad` | Mesa de aprobación de créditos. Implementada mediante un **Min-Heap** (`heapq`). A menor *score* de riesgo crediticio, mayor prioridad de atención tiene la solicitud. Utiliza un contador interno para garantizar estabilidad ante empates temporales. | Inserción: $O(\log n)$<br>Extracción: $O(\log n)$ |
+| **Cola de Prioridad de Turnos** | `ColaPrioridadTurnos` (extiende `ColaPrioridad`) | **Fila prioritaria de turnos presenciales.** Min-Heap de tuplas `(prioridad, orden_llegada, cédula)` para atender primero a personas con discapacidad, adultos mayores y mujeres embarazadas, con desempate por orden de llegada. Agrega consulta de posición, reinserción con el orden original (para *Undo*), eliminación por valor y reemplazo de cédula. | Inserción: $O(\log n)$<br>Extracción: $O(\log n)$<br>Posición / Eliminación: $O(n)$ |
 | **Tabla Hash** | `TablaHash` | Indexación de clientes por documento de identidad (cédula) y autenticación de usuarios por nombre de usuario (*alias*). Resuelve colisiones mediante encadenamiento (*chaining*) por *buckets* y ejecuta **Rehashing dinámico** al duplicar tamaño ($2k + 1$) cuando el factor de carga supera $0.75$. | Inserción: $O(1)$<br>Búsqueda: $O(1)$<br>Eliminación: $O(1)$ |
 | **Matriz Dispersa 2D** | `Matriz` | Almacenamiento bidimensional indexado por coordenadas `(fila, columna)` o tuplas compuestas `(cliente::producto)`. Se emplea en la matriz de riesgo, matriz de tasas de interés por producto/plazo y acumulado transaccional. | Asignación: $O(1)$<br>Consulta: $O(1)$ |
 
-*\* Eliminación en $O(1)$ conociendo el nodo, o $O(n)$ por predicado de búsqueda.*
+\* *Eliminación en $O(1)$ conociendo el nodo, o $O(n)$ por predicado de búsqueda.*
+
+---
+
+## 🚦 Fila Prioritaria de Turnos
+
+La atención presencial en sucursal combina **dos filas** que se consultan siempre en el mismo orden:
+
+1. **Fila prioritaria** (`ColaPrioridadTurnos`, Min-Heap): se atiende primero mientras tenga clientes.
+2. **Fila general** (`ColaFIFO`): se atiende cuando la fila prioritaria está vacía.
+
+Al solicitar turno, el cliente elige su categoría de atención. El número más bajo se atiende primero:
+
+| Prioridad | Categoría | Fila |
+| :---: | :--- | :--- |
+| 1 | Persona con discapacidad | Prioritaria |
+| 2 | Adulto mayor | Prioritaria |
+| 3 | Mujer embarazada | Prioritaria |
+| — | Ninguna (atención general) | General (FIFO) |
+
+**Reglas de funcionamiento:**
+
+- **Desempate justo:** dentro de una misma prioridad se atiende por orden de llegada (contador interno del montículo).
+- **Posición global:** la posición que ve el cliente cuenta primero la fila prioritaria y luego la general (`EstadoSistema.posicion_turno`). El contador de turnos en espera suma ambas filas (`EstadoSistema.total_turnos`).
+- **Verificación en ventanilla:** la categoría la declara el cliente, por lo que el asesor recibe el recordatorio de verificar la condición al llamar el turno.
+- **Reversibilidad:** al deshacer una atención, el cliente vuelve a la fila con su prioridad y su **orden de llegada original**, por lo que no pierde su lugar.
+- **Sincronización con clientes:** al eliminar un cliente se retira también de la fila prioritaria (y se restaura si la eliminación se deshace); al modificar su cédula, el turno conserva prioridad y orden de llegada.
+
+**Ejemplo:** si llegan en este orden Laura (embarazada), Don José (adulto mayor), Carlos (discapacidad), Marta (embarazada), Ana (discapacidad) y un cliente sin categoría, el orden de atención es: Carlos → Ana → Don José → Laura → Marta → cliente general.
 
 ---
 
@@ -101,22 +131,32 @@ En el archivo [`estructuras.py`](estructuras.py) se implementan desde cero, sin 
 El módulo [`analitica_riesgo.py`](analitica_riesgo.py) implementa algoritmos analíticos avanzados sobre matrices bidimensionales:
 
 ### 1. Reto 1: Matriz Extendida de Riesgo $(n+1) \times (m+1)$
+
 Toma la matriz dispersa de riesgo $M$ donde las filas corresponden a los clientes ($n$) y las columnas a los productos de crédito activos ($m$). Construye una grilla densa extendida calculando en tiempo lineal $O(n \times m)$:
+
 - **Última columna por fila ($j = m$):** Promedio de riesgo individual del cliente a través de todas sus líneas evaluadas:
+
   $$\overline{R}_{cliente_i} = \frac{1}{m} \sum_{j=0}^{m-1} M[i][j]$$
+
 - **Última fila por columna ($i = n$):** Promedio de riesgo sectorial del producto a través de todos los titulares:
+
   $$\overline{R}_{producto_j} = \frac{1}{n} \sum_{i=0}^{n-1} M[i][j]$$
+
 - **Celda consolidada $[n][m]$:** Promedio general consolidado de la cartera de crédito del banco:
+
   $$\overline{R}_{global} = \frac{1}{n \cdot m} \sum_{i=0}^{n-1} \sum_{j=0}^{m-1} M[i][j]$$
 
 ### 2. Reto 2: Algoritmo de Vecindad Ortogonal y Detección de Zonas de Riesgo
+
 Permite seleccionar una celda específica $(i, j)$ de la grilla original y evaluar sus vecinos inmediatos:
+
 - **Arriba:** $(i-1, j)$
 - **Abajo:** $(i+1, j)$
 - **Izquierda:** $(i, j-1)$
 - **Derecha:** $(i, j+1)$
 
 **Propiedades del algoritmo:**
+
 - **Control estricto de fronteras:** Si la celda se encuentra en una esquina o borde de la matriz, las posiciones fuera de rango se registran de forma segura como bordes nulos sin generar excepciones `IndexError`.
 - **Diagnóstico de Zona de Alto Riesgo:** Se declara una alerta crítica si **todos los vecinos válidos** superan el umbral establecido (`UMBRAL_ALERTA_RIESGO = 50 pts`).
 - **Detección del Vecino con Mayor Riesgo:** Identifica cuál de los cuadrantes ortogonales concentra el mayor indicador de exposición crediticia.
@@ -140,46 +180,52 @@ El sistema cuenta con un control de acceso basado en roles (RBAC):
 ```
 
 ### 1. Portal Público / Visitante
+
 - **Consulta de Portafolio:** Exploración interactiva del catálogo de productos y tasas vigentes sin necesidad de registrarse.
 - **Auto-registro Asistido:** Formulario de apertura de cuenta con validación de requisitos y depósito inicial opcional.
 - **Acceso a Credenciales de Prueba:** Consulta rápida de los usuarios y claves configuradas para validación en entornos académicos y de laboratorio.
 
 ### 2. Banca Personas (Clientes)
+
 - **Consulta de Perfil y Balance:** Visualización del estado de cuenta y productos bancarios suscritos.
 - **Historial de Movimientos:** Consulta detallada de transacciones con identificador único (`TX-XXXX`), fecha, hora, tipo de movimiento, saldo resultante y detalle descriptivo.
 - **Depósitos y Consignaciones:** Recepción de fondos en efectivo o transferencias con soporte para montos a gran escala (millones o billones de pesos) sin problemas de desbordamiento.
 - **Retiro de Fondos:** Validación de saldo en tiempo real antes de debitar el dinero.
 - **Transferencias Inmediatas:** Envío de fondos entre clientes registrados mediante débito/crédito sincronizado y generación de recibos digitales.
 - **Solicitud de Créditos:** Radicación formal de líneas de crédito:
-  - *Crédito Libre Inversión:* Desde \$500,000 COP, plazos de 6 a 60 meses.
-  - *Crédito Hipotecario:* Mínimo reglamentario de \$10,000,000 COP y plazo mínimo de 60 meses (hasta 360 meses).
+  - *Crédito Libre Inversión:* Desde $500,000 COP, plazos de 6 a 60 meses.
+  - *Crédito Hipotecario:* Mínimo reglamentario de $10,000,000 COP y plazo mínimo de 60 meses (hasta 360 meses).
   - La solicitud se encola en el *Min-Heap* de evaluación de riesgo.
 - **Simulador de Crédito:** Cálculo de cuotas fijas mensuales mediante la fórmula de anualidad y amortización francesa:
+
   $$\text{Cuota} = \text{Monto} \cdot \frac{i \cdot (1 + i)^n}{(1 + i)^n - 1}$$
-- **Fila Virtual y Turnos:** Solicitud de turno de atención presencial, visualización de la posición en cola y cálculo del tiempo aproximado de espera.
+
+- **Fila Virtual y Turnos:** Solicitud de turno de atención presencial indicando la categoría de atención (discapacidad, adulto mayor, embarazada o ninguna). Las categorías prioritarias ingresan a la [fila prioritaria](#-fila-prioritaria-de-turnos). El cliente puede consultar en qué fila está (prioritaria o general), su posición global y un tiempo aproximado de espera.
 - **Catálogo y Solicitud Directa:** Vinculación de nuevos productos activos a la cuenta.
 
 ### 3. Consola de Operaciones (Asesor Comercial / Empleado)
-- **Monitoreo en Tiempo Real:** Dashboard con contadores en vivo de turnos en fila y solicitudes de crédito en cola de espera.
+
+- **Monitoreo en Tiempo Real:** Dashboard con contadores en vivo de turnos en espera (fila prioritaria + fila general) y solicitudes de crédito en cola de espera.
 - **Gestión Integral de Clientes (CRUD):**
   - Registro de clientes con normalización automática de datos.
   - Búsqueda por documento en la `TablaHash` ($O(1)$).
-  - Modificación de titulares con registro de reversión.
-  - Eliminación en cascada sincronizada (remueve de la lista de clientes, tabla hash, usuarios y cola de turnos).
-- **Atención de Turnos en Ventanilla:** Desencolado secuencial de clientes (`ColaFIFO`) y llamado a taquilla.
+  - Modificación de titulares con registro de reversión (el turno activo se mantiene al cambiar la cédula).
+  - Eliminación en cascada sincronizada (remueve de la lista de clientes, tabla hash, usuarios y de ambas filas de turnos).
+- **Atención de Turnos en Ventanilla:** Llamado del siguiente cliente: primero la fila prioritaria (`ColaPrioridadTurnos`) y, cuando está vacía, la fila general (`ColaFIFO`). Se informa la categoría de atención para su verificación.
 - **Comité de Crédito:**
   - Inspección ordenada de expedientes de crédito por prioridad de riesgo (Menor riesgo $\rightarrow$ Mayor prioridad).
   - Aprobación con desembolso automático de fondos en la cuenta del cliente y generación de transacción.
   - Rechazo definitivo o re-encolado.
-- **Reversibilidad de Operaciones (Undo):** Capacidad de deshacer la última acción registrada en la `PilaLIFO` restaurando los datos a su estado previo.
+- **Reversibilidad de Operaciones (Undo):** Capacidad de deshacer la última acción registrada en la `PilaLIFO` restaurando los datos a su estado previo, incluida la atención de un turno (el cliente recupera su posición original).
 
 ### 4. Panel de Administración Central (Administrador)
+
 - **Mantenimiento del Catálogo Maestro:** Creación de nuevos productos, activación/desactivación lógica, edición de especificaciones y eliminación.
 - **Parametrización de Tasas de Interés:** Ajuste de tasas mensuales por producto y plazo dentro de la matriz de tasas.
 - **Matrices Analíticas y Reportes Gerenciales:**
   - Acumulado de transacciones financieras por cliente.
   - Matriz de evaluación de riesgo crediticio.
-  - Tablero de KPIs institucionales (clientes, usuarios, transacciones, turnos activos, solicitudes y eventos de auditoría).
+  - Tablero de KPIs institucionales (clientes, usuarios, transacciones, turnos en fila con el desglose de prioritarios, solicitudes y eventos de auditoría).
   - **Reporte Bidimensional de Riesgo (Reto 1)** con promedios cruzados y promedio general del banco.
   - **Análisis de Vecindad y Zonas de Riesgo (Reto 2)** con diagnóstico de alertas.
 - **Auditoría General del Sistema:** Consulta del historial completo de eventos diferenciando entre acciones operativas reversibles y registros informativos.
@@ -198,13 +244,14 @@ El módulo [`validaciones.py`](validaciones.py) implementa barreras de entrada p
 | **Nombre de Usuario** | Mínimo **8 caracteres alfanuméricos**. Sin espacios, símbolos ni caracteres especiales. | Normalizado a minúsculas; validación de unicidad en la tabla de usuarios. |
 | **Contraseña / PIN** | Mínimo 4 caracteres. | **Doble confirmación obligatoria** durante la captura. |
 | **Montos Monetarios** | Acepta múltiples formatos: `50000000`, `50.000.000`, `$ 50,000,000.00`. | Algoritmo *parser* inteligente que discrimina separadores de miles y decimales, soportando montos hasta un billón de pesos sin pérdida de precisión. |
-| **Crédito Hipotecario** | Monto mínimo: **\$10,000,000 COP**. Plazo mínimo: **60 meses** (5 años). | Verificación obligatoria en simulaciones y radicaciones. |
+| **Categoría de Turno** | Entero entre 0 y 3 (0 = sin categoría, 1 a 3 = categorías prioritarias). | Determina la fila de ingreso (general o prioritaria). |
+| **Crédito Hipotecario** | Monto mínimo: **$10,000,000 COP**. Plazo mínimo: **60 meses** (5 años). | Verificación obligatoria en simulaciones y radicaciones. |
 
 ---
 
 ## 💾 Capa de Persistencia y Estructura de Datos JSON
 
-Todos los datos se sincronizan en la carpeta [`data/`](data/) en formato JSON con codificación UTF-8 e indentación legible:
+Todos los datos se sincronizan en la carpeta [`data/`](data) en formato JSON con codificación UTF-8 e indentación legible:
 
 ```
 data/
@@ -219,11 +266,13 @@ data/
 
 **Mecanismo de Autocarga y Tolerancia a Fallos:** Si alguno de los archivos no existe al momento de iniciar el sistema, la clase `EstadoSistema` en [`persistencia.py`](persistencia.py) lo crea automáticamente a partir de datos iniciales maestros preconfigurados.
 
+> **Nota:** las filas de turnos (general y prioritaria) y la pila de auditoría viven únicamente en memoria: se reinician cada vez que se ejecuta el programa y no se almacenan en `data/`.
+
 ---
 
 ## 📁 Estructura del Repositorio
 
-```text
+```
 Banca/
 ├── data/                      # Archivos de base de datos en formato JSON
 │   ├── clientes.json
@@ -234,9 +283,9 @@ Banca/
 │   ├── transacciones.json
 │   └── usuarios.json
 ├── analitica_riesgo.py        # Retos 1 y 2: Matriz extendida y análisis de vecindad
-├── banco_menu.py              # Punto de entrada principal y orquestador del sistema
 ├── catalogo.py                # Visualización interactiva y fichas técnicas de productos
-├── estructuras.py             # Implementación de EDyA: ListaDoble, ColaFIFO, PilaLIFO, TablaHash, Heap, Matriz
+├── estructuras.py             # Implementación de EDyA: ListaDoble, ColaFIFO, PilaLIFO, ColaPrioridad, ColaPrioridadTurnos, TablaHash, Matriz
+├── main.py                    # Punto de entrada principal y orquestador del sistema
 ├── menu_admin.py              # Módulo de administración central y reportes gerenciales
 ├── menu_asesor.py             # Módulo de atención al público, ventanilla y comité de crédito
 ├── menu_cliente.py            # Portal de banca digital personas (autoservicio transaccional)
@@ -254,10 +303,11 @@ El sistema incluye cuentas precargadas en `data/usuarios.json` listas para reali
 
 | Rol | Usuario | Contraseña / PIN | Nombre Titular | Cédula | Características de Prueba |
 | :--- | :--- | :---: | :--- | :---: | :--- |
-
+| **Administrador** | `admin` | `1234` | ADMINISTRADOR GENERAL | `1000000001` | Panel de administración central, reportes y control de personal. |
+| **Asesor** | `asesor` | `1234` | CARLOS ASESOR BANCARIO | `1000000002` | Ventanilla, gestión de clientes y comité de crédito. |
 | **Empleado** | `empleado1` | `1234` | JORGE SALAS | `1000000004` | Funciones operativas de apoyo comercial. |
-| **Cliente** | `valen` | `1234` | VALENTINA MORALES | `1000000003` | Cuenta activa con saldo (\$235,000,000 COP), tarjeta y movimientos registrados. |
-| **Cliente** | `andrescastro01` | `5678` | ANDRES FELIPE CASTRO | `1098765432` | Cuenta activa con saldo (\$20,000,000 COP). |
+| **Cliente** | `valen` | `1234` | VALENTINA MORALES | `1000000003` | Cuenta activa con saldo ($235,000,000 COP), tarjeta y movimientos registrados. |
+| **Cliente** | `andrescastro01` | `5678` | ANDRES FELIPE CASTRO | `1098765432` | Cuenta activa con saldo ($20,000,000 COP). |
 
 *Nota: Cualquier cliente registrado desde el menú principal o por un asesor podrá iniciar sesión inmediatamente con el usuario y contraseña asignados.*
 
@@ -266,27 +316,40 @@ El sistema incluye cuentas precargadas en `data/usuarios.json` listas para reali
 ## 🚀 Instalación y Guía de Uso
 
 ### Requisitos Previos
+
 - **Python 3.8 o superior** instalado en el sistema.
 - Terminal con soporte para caracteres UTF-8 y secuencias de color ANSI (Windows Terminal, PowerShell, Bash, Zsh).
 
 ### Pasos de Ejecución
 
 1. **Clonar o descargar el repositorio:**
+
    ```bash
+   git clone https://github.com/psisprogramer/Banca.git
    cd Banca
    ```
 
 2. **Verificar la versión de Python:**
+
    ```bash
    python --version
    ```
 
 3. **Ejecutar la aplicación bancaria:**
+
    ```bash
-   python banco_menu.py
+   python main.py
    ```
 
+### Probar la Fila Prioritaria
+
+1. Inicia sesión como cliente (por ejemplo `valen`) y solicita un turno con la opción **8**, eligiendo una categoría de atención.
+2. Repite con otro cliente sin categoría.
+3. Inicia sesión como `empleado1` o `asesor` y atiende turnos con la opción **2**: la fila prioritaria sale primero.
+4. Usa **Deshacer** (opción 5) para comprobar que el cliente vuelve a su posición original.
+
 ### Compatibilidad en Windows
+
 El módulo [`ui.py`](ui.py) habilita de forma automática el procesamiento de secuencias de escape ANSI para la consola de Windows (`os.system("")`) y reconfigura los flujos de entrada y salida estándar en codificación `utf-8`, garantizando la visualización de tildes, caracteres especiales y bordes gráficos de caja.
 
 ---
@@ -294,6 +357,7 @@ El módulo [`ui.py`](ui.py) habilita de forma automática el procesamiento de se
 ## ✒️ Autoría y Propósito Académico
 
 Proyecto desarrollado como aplicación práctica y demostrativa de:
+
 - **Estructuras de Datos Lineales y No Lineales.**
 - **Algoritmos de Exploración Matricial y Vecindad en 2D.**
 - **Arquitectura de Software Limpia y Desacoplada.**

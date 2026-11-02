@@ -4,6 +4,7 @@ Banco Digital - Sistema Central
 """
 
 import datetime
+from estructuras import PRIORIDADES_TURNO
 from ui import (
     cabecera_menu, caja_mensaje, pausa, animacion_timer, confirmar,
     fmt_dinero, badge, CYAN, VERDE, VERDE_BRILLANTE, AMARILLO, ROJO, RESET, BOLD, GRIS
@@ -342,26 +343,41 @@ def menu_cliente(banco_db):
             pausa()
 
         # ----------------------------------------------------
-        # 8. TURNO DE ATENCIÓN
+        # 8. TURNO DE ATENCIÓN (fila normal FIFO + fila prioritaria)
         # ----------------------------------------------------
         elif opcion == "8":
             cabecera_menu("Solicitud de Turno en Sucursal", sesion["tipo"], sesion["nombre"])
-            if banco_db.turnos.contiene(cedula):
-                pos = banco_db.turnos.posicion(cedula)
+            pos = banco_db.posicion_turno(cedula)
+            if pos:
                 caja_mensaje("alerta", "TURNO ACTIVO", [
-                    f"Ya cuentas con un turno asignado en la fila virtual.",
+                    "Ya cuentas con un turno asignado en la fila virtual.",
                     f"Tu posición actual es la número: {BOLD}{pos}{RESET}"
                 ])
             else:
+                print(f"  {BOLD}Categoría de atención:{RESET}")
+                print(f"  {CYAN}1.{RESET} Persona con discapacidad   {GRIS}(atención prioritaria){RESET}")
+                print(f"  {CYAN}2.{RESET} Adulto mayor               {GRIS}(atención prioritaria){RESET}")
+                print(f"  {CYAN}3.{RESET} Mujer embarazada           {GRIS}(atención prioritaria){RESET}")
+                print(f"  {CYAN}0.{RESET} Ninguna                    {GRIS}(atención general){RESET}\n")
+                categoria = leer_numero_entero("Seleccione su categoría [0-3]", minimo=0, maximo=3)
+
                 animacion_timer(0.3, "Generando ficha virtual de atención")
-                banco_db.turnos.encolar(cedula)
-                pos = banco_db.turnos.posicion(cedula)
-                caja_mensaje("exito", "TURNO GENERADO", [
+                if categoria == 0:
+                    banco_db.turnos.encolar(cedula)
+                else:
+                    banco_db.turnos_prioritarios.insertar(cedula, categoria)
+                pos = banco_db.posicion_turno(cedula)
+
+                lineas = [
                     f"Turno asignado:   {BOLD}T-{cedula[-4:]}{RESET}",
                     f"Cliente:          {cliente['nombre']}",
                     f"Posición en fila: #{pos} en espera",
-                    "Un asesor comercial lo llamará en breve."
-                ])
+                ]
+                if categoria != 0:
+                    lineas.append(f"Atención prioritaria: {PRIORIDADES_TURNO[categoria]}")
+                    lineas.append("Se verificará su condición al ser atendido en ventanilla.")
+                lineas.append("Un asesor comercial lo llamará en breve.")
+                caja_mensaje("exito", "TURNO GENERADO", lineas)
             pausa()
 
         # ----------------------------------------------------
@@ -369,11 +385,13 @@ def menu_cliente(banco_db):
         # ----------------------------------------------------
         elif opcion == "9":
             cabecera_menu("Estado de Turno", sesion["tipo"], sesion["nombre"])
-            if banco_db.turnos.contiene(cedula):
-                pos = banco_db.turnos.posicion(cedula)
+            pos = banco_db.posicion_turno(cedula)
+            if pos:
+                fila = "Prioritaria" if banco_db.turnos_prioritarios.contiene(cedula) else "General"
                 caja_mensaje("info", "ESTADO DE ATENCIÓN", [
                     f"Turno:            T-{cedula[-4:]}",
-                    f"Posición actual:  #{pos} de {banco_db.turnos.tamano()} en fila",
+                    f"Fila:             {fila}",
+                    f"Posición actual:  #{pos} de {banco_db.total_turnos()} en espera",
                     f"Tiempo estimado:  ~{pos * 3} minutos",
                     f"Estado:           {badge('pendiente', 'pendiente')}"
                 ])
